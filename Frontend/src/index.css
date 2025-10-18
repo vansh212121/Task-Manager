@@ -1,0 +1,263 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* New color palette from user's image */
+    --primary-mauve: 300 100% 10%;      /* #190019 */
+    --wenge-brown: 270 40% 23%;         /* #2B124C */
+    --soft-pale: 330 40% 80%;           /* #DFB6B2 */
+    --rosy-accent: 330 30% 63%;         /* #854F6C */
+    --puce-red: 330 40% 45%;            /* #854F6C darker variant */
+    --light-neutral: 330 40% 92%;       /* #FBE4D8 */
+    
+    /* Semantic tokens */
+    --background: 300 100% 99%;
+    --foreground: 270 40% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 270 40% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 270 40% 15%;
+
+    --primary: var(--primary-mauve);
+    --primary-foreground: 330 40% 92%;
+
+    --secondary: var(--soft-pale);
+    --secondary-foreground: var(--primary-mauve);
+
+    --muted: var(--light-neutral);
+    --muted-foreground: 270 30% 40%;
+
+    --accent: var(--rosy-accent);
+    --accent-foreground: 330 40% 92%;
+
+    --destructive: 330 40% 45%;
+    --destructive-foreground: 330 40% 92%;
+
+    --border: 330 30% 85%;
+    --input: 330 30% 90%;
+    --ring: var(--primary-mauve);
+
+    --radius: 0.75rem;
+
+    /* Priority colors */
+    --priority-low: var(--light-neutral);
+    --priority-low-foreground: 270 30% 35%;
+    --priority-medium: var(--rosy-accent);
+    --priority-medium-foreground: 330 40% 92%;
+    --priority-high: var(--puce-red);
+    --priority-high-foreground: 330 40% 92%;
+
+    /* Animation variables */
+    --transition-base: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-modal: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: 270 40% 8%;
+    --foreground: 330 40% 92%;
+
+    --card: 270 40% 12%;
+    --card-foreground: 330 40% 92%;
+
+    --popover: 270 40% 12%;
+    --popover-foreground: 330 40% 92%;
+
+    --primary: var(--rosy-accent);
+    --primary-foreground: 270 40% 8%;
+
+    --secondary: var(--wenge-brown);
+    --secondary-foreground: 330 40% 92%;
+
+    --muted: var(--wenge-brown);
+    --muted-foreground: 330 30% 70%;
+
+    --accent: var(--rosy-accent);
+    --accent-foreground: 270 40% 8%;
+
+    --destructive: 330 40% 45%;
+    --destructive-foreground: 330 40% 92%;
+
+    --border: 270 40% 20%;
+    --input: 270 40% 20%;
+    --ring: var(--rosy-accent);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fade-in var(--transition-base);
+  }
+
+  .animate-fade-out {
+    animation: fade-out var(--transition-base);
+  }
+
+  .animate-slide-up {
+    animation: slide-up var(--transition-base);
+  }
+
+  .animate-scale-in {
+    animation: scale-in var(--transition-modal);
+  }
+
+  .animate-shimmer {
+    animation: shimmer 1.5s infinite;
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted) / 0.8) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* Micro-interactions */
+  .hover-lift {
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px hsl(var(--primary-mauve) / 0.1);
+  }
+
+  .hover-lift:active {
+    transform: scale(0.98);
+  }
+
+  /* Focus visible styles */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+}
+
+@layer components {
+  /* Skeleton loader */
+  .skeleton {
+    @apply animate-shimmer rounded-md bg-muted;
+  }
+
+  /* Page transition */
+  .page-transition {
+    animation: page-enter 220ms ease-out;
+  }
+
+  /* Toast slide up */
+  .toast-enter {
+    animation: toast-slide-up 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
