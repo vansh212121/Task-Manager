@@ -27,7 +27,6 @@ from app.core.exceptions import (
     ResourceNotFound,
     NotAuthorized,
     ValidationError,
-    ResourceAlreadyExists,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,18 +88,76 @@ class TaskService:
     ) -> Optional[TaskResponse]:
         """Retrieve task by it's ID"""
         # Fine-grained authorization check
-        if str(current_user.id) != str(task_id):
-            raise NotAuthorized("You are not authorized to view this task.")
-
-        user = await cache_service.get_or_set(
+        task = await cache_service.get_or_set(
             schema_type=TaskResponse,
             obj_id=task_id,
             loader=lambda: self._load_user_schema_from_db(db=db, task_id=task_id),
             ttl=300,  # Cache for 5 minutes
         )
 
+        if str(current_user.id) != str(task.user_id):
+            raise NotAuthorized("You are not authorized to view this task.")
+
         self._logger.debug(f"Task {task_id} retrieved by user {current_user.id}")
-        return user
+        return task
+
+    async def get_all_user_tasks(
+        self,
+        db: AsyncSession,
+        *,
+        current_user: User,
+        skip: int = 0,
+        limit: int = 50,
+        filters: Optional[Dict[str, Any]] = None,
+        order_by: str = "created_at",
+        order_desc: bool = True,
+    ) -> TaskListResponse:
+        """
+        Lists appliances with pagination and filtering.
+
+        Args:
+            db: Database session
+            current_user: User making the request
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            filters: Optional filters to apply
+            order_by: Field to order by
+            order_desc: Whether to order in descending order
+
+        Returns:
+            UserApplianceListResponse: Paginated list of users
+
+        Raises:
+            NotAuthorized: If user lacks permission to list users
+            ValidationError: If pagination parameters are invalid
+        """
+        # Input validation
+        if skip < 0:
+            raise ValidationError("Skip parameter must be non-negative")
+        if limit <= 0 or limit > 100:
+            raise ValidationError("Limit must be between 1 and 100")
+
+        # Delegate fetching to the repository
+        tasks, total = await self.task_repository.get_all(
+            db=db,
+            skip=skip,
+            limit=limit,
+            user_id=current_user.id,
+            filters=filters,
+            order_by=order_by,
+            order_desc=order_desc,
+        )
+
+        # Calculate pagination info
+        page = (skip // limit) + 1
+        total_pages = (total + limit - 1) // limit  # Ceiling division
+
+        # Construct the response schema
+        response = TaskListResponse(
+            items=tasks, total=total, page=page, pages=total_pages, size=limit
+        )
+
+        return response
 
     async def create_task(
         self, db: AsyncSession, *, task_dict: TaskCreate, current_user: User
@@ -108,47 +165,37 @@ class TaskService:
         """
         Handles the business logic of creating a new task.
         """
-        # 1. check for user
-        user = self.user_repository.get(db=db, obj_id=current_user.id)
-        raise_for_status(
-            condition=(user is None),
-            exception=ResourceNotFound,
-            detail=f"User with id {current_user.id} not Found.",
-            resource_type="User",
-        )
-        self._check_authorization(
-            current_user=current_user, target_task="", action="Create"
-        )
 
         # 2. Prepare the user model
         task_dict = task_dict.model_dump()
+        task_dict["user_id"] = current_user.id
         task_dict["created_at"] = datetime.now(timezone.utc)
         task_dict["updated_at"] = datetime.now(timezone.utc)
 
-        task_to_create = User(**task_dict)
+        task_to_create = Task(**task_dict)
 
         # 3. Delegate creation to the repository
         new_task = await self.task_repository.create(db=db, db_obj=task_to_create)
-        self._logger.info(f"New task created: {new_task.email}")
+        self._logger.info(f"New task created: {new_task.title}")
 
         return new_task
 
-    async def update_user(
+    async def update_task(
         self,
         db: AsyncSession,
         *,
         task_id_to_update: uuid.UUID,
         task_data: TaskUpdate,
         current_user: User,
-    ) -> User:
-        """Updates a user after performing necessary authorization checks."""
+    ) -> Task:
+        """Updates a task after performing necessary authorization checks."""
 
         task_to_update = await self.task_repository.get(db=db, obj_id=task_id_to_update)
         raise_for_status(
             condition=(task_to_update is None),
             exception=ResourceNotFound,
-            detail=f"User not Found",
-            resource_type="User",
+            detail=f"Task with id {task_id_to_update} not Found",
+            resource_type="Task",
         )
 
         self._check_authorization(
@@ -161,13 +208,13 @@ class TaskService:
         for ts_field in {"created_at", "updated_at"}:
             update_dict.pop(ts_field, None)
 
-        updated_user = await self.user_repository.update(
+        updated_task = await self.task_repository.update(
             db=db,
-            user=task_to_update,
+            task=task_to_update,
             fields_to_update=update_dict,
         )
 
-        await cache_service.invalidate(User, task_id_to_update)
+        await cache_service.invalidate(Task, task_id_to_update)
 
         self._logger.info(
             f"Task {task_id_to_update} updated by {current_user.id}",
@@ -177,55 +224,57 @@ class TaskService:
                 "updated_fields": list(update_dict.keys()),
             },
         )
-        return updated_user
+        return updated_task
 
-    async def delete_user(
-        self, db: AsyncSession, *, user_id_to_delete: uuid.UUID, current_user: User
+    async def delete_task(
+        self, db: AsyncSession, *, task_id_to_delete: uuid.UUID, current_user: User
     ) -> Dict[str, str]:
         """
-        Permanently deletes a user account.
+        Permanently deletes a task.
 
         Args:
             db: Database session
-            user_id_to_delete: ID of user to delete
+            task_id_to_delete: ID of task to delete
             current_user: User making the request
 
         Returns:
             Dict with success message
 
         Raises:
-            ResourceNotFound: If user doesn't exist
+            ResourceNotFound: If task doesn't exist
         """
         # Input validation
 
-        # 1. Fetch the user to delete
-        user_to_delete = await self.user_repository.get(db=db, obj_id=user_id_to_delete)
-
+        # 1. Fetch the task to delete
+        task_to_delete = await self.task_repository.get(db=db, obj_id=task_id_to_delete)
         raise_for_status(
-            condition=(user_to_delete is None),
+            condition=(task_to_delete is None),
             exception=ResourceNotFound,
-            detail=f"User with id {user_id_to_delete} not Found",
-            resource_type="User",
+            detail=f"Task with id {task_id_to_delete} not Found",
+            resource_type="Task",
         )
 
         # 2. Perform authorization check
         self._check_authorization(
             current_user=current_user,
-            target_user=user_to_delete,
+            target_task=task_to_delete,
             action="delete",
         )
 
         # 3. Perform the deletion
-        await self.user_repository.delete(db=db, obj_id=user_id_to_delete)
+        await self.task_repository.delete(db=db, obj_id=task_id_to_delete)
 
         # 4. Clean up cache and tokens
-        await cache_service.invalidate(User, user_id_to_delete)
+        await cache_service.invalidate(Task, task_id_to_delete)
 
         self._logger.warning(
-            f"User {user_id_to_delete} permanently deleted by {current_user.id}",
+            f"Task {task_id_to_delete} permanently deleted by {current_user.id}",
             extra={
-                "deleted_user_id": user_id_to_delete,
+                "deleted_task_id": task_id_to_delete,
                 "deleter_id": current_user.id,
-                "deleted_user_email": user_to_delete.email,
+                "deleted_task_title": task_to_delete.title,
             },
         )
+
+
+task_service = TaskService()

@@ -10,7 +10,6 @@ from sqlmodel import select, func, and_, or_, delete
 from app.core.exception_utils import handle_exceptions
 from app.core.exceptions import InternalServerError
 
-from app.models.user_model import User
 from app.models.task_model import Task
 
 logger = logging.getLogger(__name__)
@@ -71,13 +70,14 @@ class TaskRepository(BaseRepository[Task]):
         db: AsyncSession,
         *,
         skip: int = 0,
+        user_id: uuid.UUID,
         limit: int = 100,
         filters: Optional[Dict[str, Any]] = None,
         order_by: str = "created_at",
         order_desc: bool = True,
     ) -> Tuple[List[Task], int]:
         """Get multiple tasks with filtering and pagination."""
-        query = select(self.model)
+        query = select(self.model).where(self.model.user_id == user_id)
 
         # Apply filters
         if filters:
@@ -161,8 +161,7 @@ class TaskRepository(BaseRepository[Task]):
             search_term = f"%{filters['search']}%"
             conditions.append(
                 or_(
-                    User.name.ilike(search_term),
-                    User.email.ilike(search_term),
+                    Task.title.ilike(search_term),
                 )
             )
 

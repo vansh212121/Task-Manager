@@ -29,8 +29,8 @@ class TaskBase(BaseModel):
         description="Task's description",
         examples=["Eat medicine at 4pm"],
     )
-    priority: Priority = Field(..., description="Task's priority", examples=["Low"])
-    status: TaskStatus = Field(..., description="Task's status", examples=["Completed"])
+    priority: Priority = Field(..., description="Task's priority", examples=["low"])
+    status: TaskStatus = Field(..., description="Task's status", examples=["completed"])
 
     @field_validator("title", "description")
     @classmethod
@@ -66,10 +66,10 @@ class TaskUpdate(BaseModel):
         examples=["Eat medicine at 4pm"],
     )
     priority: Optional[Priority] = Field(
-        None, description="Task's priority", examples=["Low"]
+        None, description="Task's priority", examples=["low"]
     )
     status: Optional[TaskStatus] = Field(
-        None, description="Task's status", examples=["Completed"]
+        None, description="Task's status", examples=["completed"]
     )
 
     @field_validator("title", "description")

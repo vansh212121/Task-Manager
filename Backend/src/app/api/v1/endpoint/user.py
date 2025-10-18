@@ -7,6 +7,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.schemas.user_schema import UserResponse, UserUpdate
+from app.schemas.task_schema import TaskListResponse, TaskSearchParams
 from app.schemas.auth_schema import UserPasswordChange
 from app.models.user_model import User
 from app.db.session import get_session
@@ -19,6 +20,7 @@ from app.utils.deps import (
 )
 from app.services.user_service import user_service
 from app.services.auth_service import auth_service
+from app.services.task_service import task_service
 
 logger = logging.getLogger(__name__)
 
@@ -114,3 +116,35 @@ async def change_my_password(
     )
 
     return {"message": "Password updated successfully"}
+
+
+@router.get(
+    "/me/tasks",
+    response_model=TaskListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List my bills",
+    description="Get a paginated and filterable list of my tasks.",
+    dependencies=[
+        Depends(rate_limit_api),
+    ],  # Simplified the auth check)
+)
+async def get_my_tasks(
+    *,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+    pagination: PaginationParams = Depends(get_pagination_params),
+    search_params: TaskSearchParams = Depends(TaskSearchParams),
+    order_by: str = Query("created_at", description="Field to order by"),
+    order_desc: bool = Query(True, description="Order descending"),
+):
+    """get paginated response of current_user bills"""
+
+    return await task_service.get_all_user_tasks(
+        db=db,
+        current_user=current_user,
+        order_by=order_by,
+        filters=search_params.model_dump(exclude_none=True),
+        order_desc=order_desc,
+        skip=pagination.skip,
+        limit=pagination.limit,
+    )
