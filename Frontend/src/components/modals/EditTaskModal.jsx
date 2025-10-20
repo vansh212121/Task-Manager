@@ -19,21 +19,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export const EditTaskModal = ({ task, open, onOpenChange, onSubmit }) => {
+export const EditTaskModal = ({ task, open, onOpenChange, onSubmit, isLoading }) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("Medium");
   const [status, setStatus] = useState("Pending");
   const [errors, setErrors] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+
+  const capitalize = (s) => s && s.charAt(0).toUpperCase() + s.slice(1);
 
   useEffect(() => {
     if (task && open) {
       setTitle(task.title);
       setDescription(task.description);
-      setPriority(task.priority);
-      setStatus(task.status);
+      setPriority(capitalize(task.priority));
+      setStatus(capitalize(task.status));
       setHasChanges(false);
     }
   }, [task, open]);
@@ -64,21 +65,18 @@ export const EditTaskModal = ({ task, open, onOpenChange, onSubmit }) => {
       return;
     }
 
-    setIsLoading(true);
     try {
       await onSubmit(task.id, {
         title: title.trim(),
         description: description.trim(),
-        priority,
-        status,
+        priority: priority.toLowerCase(),
+        status: status.toLowerCase(),
       });
       setErrors({});
       onOpenChange(false);
     } catch (error) {
       // Error handled by parent
-    } finally {
-      setIsLoading(false);
-    }
+    } 
   };
 
   const handleClose = () => {

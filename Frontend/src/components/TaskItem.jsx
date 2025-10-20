@@ -5,21 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Edit2, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 
-export const TaskItem = ({
-  task,
-  onToggleComplete,
-  onEdit,
-  onDelete,
-  isOptimistic = false,
-}) => {
+export const TaskItem = ({ task, onToggleComplete, onEdit, onDelete }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const isCompleted = task.status === "Completed";
+  const isCompleted = task.status === "completed";
 
   const getPriorityVariant = (priority) => {
     const variants = {
-      Low: "low",
-      Medium: "medium",
-      High: "high",
+      low: "low",
+      medium: "medium",
+      high: "high",
     };
     return variants[priority];
   };
@@ -29,7 +23,6 @@ export const TaskItem = ({
       className={`
         group bg-card rounded-lg border p-4 transition-all duration-200
         hover-lift
-        ${isOptimistic ? "opacity-60" : ""}
         ${isCompleted ? "opacity-75" : ""}
       `}
     >
@@ -37,14 +30,8 @@ export const TaskItem = ({
         <div className="relative pt-1">
           <Checkbox
             checked={isCompleted}
-            onCheckedChange={() => onToggleComplete(task.id, isCompleted)}
-            className={isOptimistic ? "pointer-events-none" : ""}
+            onCheckedChange={() => onToggleComplete(task.id, task.status)}
           />
-          {isOptimistic && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-3 h-3 border-2 border-t-primary rounded-full animate-spin" />
-            </div>
-          )}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -86,7 +73,7 @@ export const TaskItem = ({
               {task.priority}
             </Badge>
             <span className="text-xs text-muted-foreground">
-              {format(new Date(task.createdAt), "MMM d, yyyy")}
+              {format(new Date(task.created_at), "MMM d, yyyy")}
             </span>
             <button
               onClick={() => setIsExpanded(!isExpanded)}
@@ -130,7 +117,7 @@ export const TaskItem = ({
                 <div>
                   <p className="text-xs font-medium text-foreground">Created</p>
                   <p className="text-xs text-muted-foreground">
-                    {format(new Date(task.createdAt), "PPP")}
+                    {format(new Date(task.created_at), "PPP")}
                   </p>
                 </div>
               </div>

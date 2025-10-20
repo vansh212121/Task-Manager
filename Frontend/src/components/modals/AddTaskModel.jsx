@@ -19,13 +19,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export const AddTaskModal = ({ open, onOpenChange, onSubmit }) => {
+export const AddTaskModal = ({ open, onOpenChange, onSubmit, isLoading }) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("Medium");
   const [errors, setErrors] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
@@ -43,12 +42,11 @@ export const AddTaskModal = ({ open, onOpenChange, onSubmit }) => {
       return;
     }
 
-    setIsLoading(true);
     try {
       await onSubmit({
         title: title.trim(),
         description: description.trim(),
-        priority,
+        priority: priority.toLowerCase(),
       });
       // Reset form
       setTitle("");
@@ -56,11 +54,7 @@ export const AddTaskModal = ({ open, onOpenChange, onSubmit }) => {
       setPriority("Medium");
       setErrors({});
       onOpenChange(false);
-    } catch (error) {
-      // Error handled by parent
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (error) {}
   };
 
   const handleClose = () => {

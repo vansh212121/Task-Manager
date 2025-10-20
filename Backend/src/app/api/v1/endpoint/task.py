@@ -3,7 +3,6 @@ import uuid
 
 from typing import Dict
 from fastapi import APIRouter, Depends, status
-
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings

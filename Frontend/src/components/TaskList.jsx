@@ -7,7 +7,6 @@ export const TaskList = ({
   onEdit,
   onDelete,
   isLoading,
-  optimisticTaskId,
 }) => {
   if (isLoading) {
     return (
@@ -44,7 +43,6 @@ export const TaskList = ({
           onToggleComplete={onToggleComplete}
           onEdit={onEdit}
           onDelete={onDelete}
-          isOptimistic={task.id === optimisticTaskId}
         />
       ))}
     </div>

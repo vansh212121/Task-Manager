@@ -30,7 +30,6 @@ class TaskBase(BaseModel):
         examples=["Eat medicine at 4pm"],
     )
     priority: Priority = Field(..., description="Task's priority", examples=["low"])
-    status: TaskStatus = Field(..., description="Task's status", examples=["completed"])
 
     @field_validator("title", "description")
     @classmethod
@@ -97,6 +96,7 @@ class TaskResponse(TaskBase):
 
     id: uuid.UUID = Field(..., description="Task ID")
     user_id: uuid.UUID = Field(..., description="User ID")
+    status: TaskStatus = Field(..., description="Task's status", examples=["completed"])
     created_at: datetime = Field(..., description="Task creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
 

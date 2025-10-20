@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,10 +12,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { mockApi, mockUser } from "@/lib/mockData";
-import { Eye, EyeOff, AlertTriangle, Check, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import {
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  Check,
+  X,
+  Loader2,
+  Save,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,22 +31,57 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  useChangeMyPasswordMutation,
+  useDeleteMyAccountMutation,
+  useGetMeQuery,
+  useUpdateMyAccountMutation,
+} from "@/features/api/userApi";
+import { toast } from "sonner";
+import { handleError } from "@/lib/handleError";
 
 const Settings = () => {
-  const { toast } = useToast();
-  const navigate = useNavigate();
-
   // Profile
-  const [name, setName] = useState(mockUser.name);
-  const [email, setEmail] = useState(mockUser.email);
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const { data: currentUser, isLoading: isLoadingUser } = useGetMeQuery();
+  const [profileData, setProfileData] = useState({
+    name: "",
+    email: "",
+  });
+  const [passwordData, setPasswordData] = useState({
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
+  });
+
+  // Apis
+  const [updateMyProfile, { isLoading: isUpdatingProfile }] =
+    useUpdateMyAccountMutation();
+  const [changeMyPassword, { isLoading: isChangingPassword }] =
+    useChangeMyPasswordMutation();
+  const [deleteMyAccount, { isLoading: isDeleting }] =
+    useDeleteMyAccountMutation();
+
+  // Populate data
+  useEffect(() => {
+    if (currentUser) {
+      setProfileData({
+        name: currentUser.name || "",
+        email: currentUser.email || "",
+      });
+    }
+  }, [currentUser]);
+
+  // --- Handlers ---
+  const handleProfileInputChange = (e) => {
+    setProfileData({ ...profileData, [e.target.id]: e.target.value });
+  };
+
+  const handlePasswordInputChange = (e) => {
+    setPasswordData({ ...passwordData, [e.target.id]: e.target.value });
+  };
 
   // Password
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPasswords, setShowPasswords] = useState(false);
-  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // Terms
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -49,114 +89,91 @@ const Settings = () => {
   // Delete Account
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
 
+  // Profile Update
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    const changedData = Object.keys(profileData).reduce((acc, key) => {
+      if (profileData[key] !== currentUser[key]) acc[key] = profileData[key];
+      return acc;
+    }, {});
+
+    if (Object.keys(changedData).length === 0) {
+      toast.info("No profile changes to save.");
+      return;
+    }
+
+    toast.promise(updateMyProfile(changedData).unwrap(), {
+      loading: "Updating your profile...",
+      success: "Profile updated successfully!",
+      error: (err) => handleError(err, "Failed to update profile."),
+    });
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      toast.error("New passwords do not match.");
+      return;
+    }
+    const promise = changeMyPassword({
+      current_password: passwordData.current_password,
+      new_password: passwordData.new_password,
+    }).unwrap();
+
+    toast.promise(promise, {
+      loading: "Changing your password...",
+      success: () => {
+        setPasswordData({
+          current_password: "",
+          new_password: "",
+          confirm_password: "",
+        });
+        return "Password changed successfully! You are being logged out for security.";
+      },
+      error: (err) => handleError(err, "Failed to change password."),
+    });
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      await deleteMyAccount().unwrap();
+      toast.success("Account deleted successfully!");
+      setShowDeleteDialog(false);
+    } catch (err) {
+      console.error("Deactivation failed:", err);
+      toast.error("Failed to deactivate account. Logging out locally.");
+      setShowDeleteDialog(false);
+    }
+  };
+
+  // Password Validation
   const validatePassword = (password) => {
     const hasMinLength = password.length >= 8;
     const hasNumber = /\d/.test(password);
     const hasLetter = /[a-zA-Z]/.test(password);
+    // You might also need hasSpecialChar here if your backend requires it
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
     return {
       hasMinLength,
       hasNumber,
       hasLetter,
-      isValid: hasMinLength && hasNumber && hasLetter,
+      hasSpecialChar, // Include this if needed
+      // Check all required conditions
+      isValid: hasMinLength && hasNumber && hasLetter && hasSpecialChar,
     };
   };
 
-  const passwordValidation = validatePassword(newPassword);
+  const passwordValidation = validatePassword(passwordData.new_password);
 
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    setIsUpdatingProfile(true);
-
-    try {
-      await mockApi.updateProfile(name, email);
-      toast({
-        title: "Profile updated",
-        description: "Your profile information has been saved.",
-        duration: 3000,
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Update failed",
-        description:
-          error instanceof Error ? error.message : "Something went wrong",
-        duration: 4000,
-      });
-    } finally {
-      setIsUpdatingProfile(false);
-    }
-  };
-
-  const handleUpdatePassword = async (e) => {
-    e.preventDefault();
-
-    if (!passwordValidation.isValid) {
-      toast({
-        variant: "destructive",
-        title: "Invalid password",
-        description: "Password does not meet requirements",
-      });
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Passwords don't match",
-        description: "New password and confirmation must match",
-      });
-      return;
-    }
-
-    setIsUpdatingPassword(true);
-
-    try {
-      await mockApi.updatePassword(currentPassword, newPassword);
-      toast({
-        title: "Password updated",
-        description: "Your password has been changed successfully.",
-        duration: 3000,
-      });
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Update failed",
-        description:
-          error instanceof Error ? error.message : "Something went wrong",
-        duration: 4000,
-      });
-    } finally {
-      setIsUpdatingPassword(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    setIsDeleting(true);
-
-    try {
-      await mockApi.deleteAccount();
-      toast({
-        title: "Account deleted",
-        description: "Your account has been permanently deleted.",
-        duration: 3000,
-      });
-      navigate("/login");
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Delete failed",
-        description:
-          error instanceof Error ? error.message : "Something went wrong",
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+  // --- Loading State ---
+  if (isLoadingUser) {
+    return (
+      <div className="p-8 flex justify-center items-center h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background page-transition">
@@ -190,13 +207,13 @@ const Settings = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                <form onSubmit={handleProfileSubmit} className="space-y-4">
                   <div>
                     <Label htmlFor="name">Full name</Label>
                     <Input
                       id="name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      value={profileData.name}
+                      onChange={handleProfileInputChange}
                       className="mt-1 focus-ring"
                     />
                   </div>
@@ -206,8 +223,8 @@ const Settings = () => {
                     <Input
                       id="email"
                       type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      value={profileData.email}
+                      onChange={handleProfileInputChange}
                       className="mt-1 focus-ring"
                     />
                   </div>
@@ -230,15 +247,17 @@ const Settings = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <form onSubmit={handlePasswordSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="current">Current password</Label>
+                    <Label htmlFor="current_password">Current password</Label>
                     <div className="relative mt-1">
                       <Input
-                        id="current"
+                        id="current_password"
                         type={showPasswords ? "text" : "password"}
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Enter current password"
+                        value={passwordData.current_password}
+                        onChange={handlePasswordInputChange}
+                        required
                         className="focus-ring"
                       />
                       <button
@@ -256,15 +275,17 @@ const Settings = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="new">New password</Label>
+                    <Label htmlFor="new_password">New password</Label>
                     <Input
-                      id="new"
+                      id="new_password"
                       type={showPasswords ? "text" : "password"}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
+                      value={passwordData.new_password}
+                      onChange={handlePasswordInputChange}
+                      placeholder="Enter new password"
+                      required
                       className="mt-1 focus-ring"
                     />
-                    {newPassword && (
+                    {passwordData.new_password && (
                       <div className="mt-2 space-y-1">
                         <PasswordRequirement
                           met={passwordValidation.hasMinLength}
@@ -277,23 +298,45 @@ const Settings = () => {
                         <PasswordRequirement met={passwordValidation.hasLetter}>
                           Contains a letter
                         </PasswordRequirement>
+                        {/* Add this back if your backend requires it */}
+                        <PasswordRequirement
+                          met={passwordValidation.hasSpecialChar}
+                        >
+                          Contains a special character
+                        </PasswordRequirement>
                       </div>
                     )}
                   </div>
-
                   <div>
-                    <Label htmlFor="confirm">Confirm new password</Label>
+                    <Label htmlFor="confirm_password">
+                      Confirm new password
+                    </Label>
                     <Input
-                      id="confirm"
+                      id="confirm_password"
                       type={showPasswords ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      value={passwordData.confirm_password}
+                      onChange={handlePasswordInputChange}
+                      placeholder="Confirm new password"
+                      required
                       className="mt-1 focus-ring"
                     />
                   </div>
-
+                  {/* 
                   <Button type="submit" disabled={isUpdatingPassword}>
                     {isUpdatingPassword ? "Updating..." : "Update password"}
+                  </Button> */}
+                  <Button type="submit" disabled={isChangingPassword}>
+                    {isChangingPassword ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Changing...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Change Password
+                      </>
+                    )}
                   </Button>
                 </form>
               </CardContent>

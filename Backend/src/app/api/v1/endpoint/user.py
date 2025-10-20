@@ -122,7 +122,7 @@ async def change_my_password(
     "/me/tasks",
     response_model=TaskListResponse,
     status_code=status.HTTP_200_OK,
-    summary="List my bills",
+    summary="List my tasks",
     description="Get a paginated and filterable list of my tasks.",
     dependencies=[
         Depends(rate_limit_api),
